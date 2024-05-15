@@ -139,6 +139,7 @@ cnn_model = NaiveCNN()
 LF_model = LateFusionModel(cnn_model, num_frames)
 
 root_dir = './dataset'
+test_root_dir = './dataset_test'
 
 emotion_labels = {
     '01-neutral': 0,
@@ -151,7 +152,7 @@ emotion_labels = {
     '08-surprised': 7
 }
 
-dataset = EmotionDataset(root_dir, emotion_labels, num_frames)
+dataset = EmotionDataset(test_root_dir, emotion_labels, num_frames)
 
 train_size = int(0.8 * len(dataset))
 test_size = len(dataset) - train_size
