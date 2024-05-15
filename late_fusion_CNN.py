@@ -15,8 +15,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-from PIL import Image
+from torch.utils.data import DataLoader, Dataset, random_split
+#from PIL import Image
 
 
 class NaiveCNN(nn.Module):
@@ -81,18 +81,19 @@ class EmotionDataset(Dataset):
         self.emotion_labels = emotion_labels
         #self.transform = transform
         self.n_frames = n_frames
-        self.video_paths = []
-        self.labels = []
+        self.video_paths, self.labels = self._load_dataset()
 
-        # Load all video paths and their corresponding labels
-        for folder_name in os.listdir(root_dir):
-            if folder_name in emotion_labels:
-                label = emotion_labels[folder_name]
-                folder_path = os.path.join(root_dir, folder_name)
-                for video_name in os.listdir(folder_path):
-                    if video_name.endswith('.mp4'):
-                        self.video_paths.append(os.path.join(folder_path, video_name))
-                        self.labels.append(label)
+    def _load_dataset(self):
+        video_paths = []
+        labels = []
+        for emotion, label in self.emotion_labels.items():
+            emotion_folder = os.path.join(self.root_dir, emotion)
+            for video_name in os.listdir(emotion_folder):
+                video_path = os.path.join(emotion_folder, video_name)
+                video_paths.append(video_path)
+                labels.append(label)
+
+        return video_paths, labels
 
     def __len__(self):
         return len(self.video_paths)
@@ -151,7 +152,13 @@ emotion_labels = {
 }
 
 dataset = EmotionDataset(root_dir, emotion_labels, num_frames)
-dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
+train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+
+train_dataloader = DataLoader(train_dataset, batch_size=2, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size=2, shuffle=False)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(LF_model.parameters(), lr=0.001)
@@ -159,11 +166,30 @@ optimizer = optim.Adam(LF_model.parameters(), lr=0.001)
 num_epochs = 10
 for epoch in range(num_epochs):
     running_loss = 0.0
-    for inputs, labels in dataloader:
+    for inputs, e_labels in train_dataloader:
         optimizer.zero_grad()
         outputs = LF_model(inputs)
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs, e_labels)
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(dataloader)}')
+
+# Save trained weights of CNN and LF models
+torch.save(cnn_model.state_dict(), 'naive_cnn_weights.pth')
+torch.save(LF_model.state_dict(), 'late_fusion_weights.pth')
+
+LF_model.eval()
+test_loss = 0.0
+correct = 0
+total = 0
+with torch.no_grad():
+    for inputs, e_labels in test_dataloader:
+        outputs = LF_model(inputs)
+        loss = criterion(outputs, e_labels)
+        test_loss += loss.item()
+        _, predicted = torch.max(outputs, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+print(f'Test Loss: {test_loss/len(test_dataloader)}, Accuracy: {100 * correct / total}%')
