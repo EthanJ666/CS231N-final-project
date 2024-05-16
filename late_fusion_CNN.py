@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
+from torch.utils.tensorboard import SummaryWriter
 from EmotionDataset import EmotionDataset
 from EmotionFrameDataset import EmotionFrameDataset
 #from PIL import Image
@@ -78,6 +79,8 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f'using device {device}')
 
+    writer = SummaryWriter()
+
     cnn_model = NaiveCNN().to(device)
     LF_model = LateFusionModel(cnn_model, num_frames).to(device)
     
@@ -112,7 +115,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(LF_model.parameters(), lr=0.001)
 
-    num_epochs = 10
+    num_epochs = 1
     print(f'Training for {num_epochs} epochs...')
 
     for epoch in range(num_epochs):
@@ -130,7 +133,9 @@ if __name__ == "__main__":
                 running_loss += loss.item()
 
                 tepoch.set_postfix(loss=loss.item())
-            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_dataloader)}')
+            avg_running_loss = running_loss/len(train_dataloader)
+            writer.add_scalar("Loss/train", avg_running_loss, epoch+1)
+            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {avg_running_loss}')
 
     # Save trained weights of CNN and LF models
     torch.save(cnn_model.state_dict(), 'naive_cnn_weights.pth')
@@ -153,3 +158,6 @@ if __name__ == "__main__":
                 correct += (predicted == e_labels).sum().item()
 
     print(f'Test Loss: {test_loss/len(test_dataloader)}, Accuracy: {100 * correct / total}%')
+    writer.add_scalar("Acc/test", 100 * correct / total, 0)
+    writer.flush()
+    writer.close()
