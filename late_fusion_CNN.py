@@ -78,9 +78,9 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f'using device {device}')
 
-    cnn_model = NaiveCNN()
+    cnn_model = NaiveCNN().to(device)
     LF_model = LateFusionModel(cnn_model, num_frames).to(device)
-
+    
     #######################################################
     #################### Edit Dataset #####################
     #######################################################
@@ -144,6 +144,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         with tqdm(test_dataloader, unit="batch") as tepoch:
             for inputs, e_labels in tepoch:
+                inputs, e_labels = inputs.to(device), e_labels.to(device)
                 outputs = LF_model(inputs)
                 loss = criterion(outputs, e_labels)
                 test_loss += loss.item()
