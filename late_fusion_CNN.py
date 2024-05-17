@@ -26,19 +26,26 @@ class NaiveCNN(nn.Module):
     """
     def __init__(self):
         super(NaiveCNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1, padding_mode='zeros')
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1, padding_mode='zeros')
+        self.conv1_bn = nn.BatchNorm2d(16)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1, padding_mode='zeros')
+        self.conv2_bn = nn.BatchNorm2d(32)
         self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1, padding_mode='zeros')
+        self.conv3_bn = nn.BatchNorm2d(64)
+        self.conv4 = nn.Conv2d(64, 128, kernel_size=3, padding=1, padding_mode='zeros')
+        self.conv4_bn = nn.BatchNorm2d(128)
         #self.fc1 = nn.Linear(64 * 160 * 90, 1024)
-        self.fc1 = nn.Linear(64 * 160 * 90, 512)
+        self.fc1 = nn.Linear(128 * 80 * 45, 512)
+        self.fc1_bn = nn.BatchNorm1d(512)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-        x = x.reshape(-1, 64 * 160 * 90)
-        x = F.relu(self.fc1(x))
+        x = self.pool(F.relu(self.conv1_bn(self.conv1(x))))
+        x = self.pool(F.relu(self.conv2_bn(self.conv2(x))))
+        x = self.pool(F.relu(self.conv3_bn(self.conv3(x))))
+        x = self.pool(F.relu(self.conv4_bn(self.conv4(x))))
+        x = x.reshape(-1, 128 * 80 * 45)
+        x = F.relu(self.fc1_bn(self.fc1(x)))
         #x = nn.ReLU(self.fc2(x))
 
         return x
@@ -53,6 +60,7 @@ class LateFusionModel(nn.Module):
         super(LateFusionModel, self).__init__()
         self.cnn = cnn
         self.fc1 = nn.Linear(n_frames * cnn_features, 1024)
+        self.fc1_bn = nn.BatchNorm1d(1024)
         self.fc2 = nn.Linear(1024, num_classes)
 
     def forward(self, x):
@@ -67,7 +75,7 @@ class LateFusionModel(nn.Module):
         cnn_features = torch.cat(frame_features, dim=1)
         cnn_features = cnn_features.view(B, -1)
 
-        y = F.relu(self.fc1(cnn_features))
+        y = F.relu(self.fc1_bn(self.fc1(cnn_features)))
         out = self.fc2(y)
 
         return out
@@ -83,6 +91,9 @@ if __name__ == "__main__":
 
     cnn_model = NaiveCNN().to(device)
     LF_model = LateFusionModel(cnn_model, num_frames).to(device)
+
+    pytorch_total_params = sum(p.numel() for p in LF_model.parameters() if p.requires_grad)
+    print(f'total params: {pytorch_total_params}')
     
     #######################################################
     #################### Edit Dataset #####################
@@ -109,13 +120,13 @@ if __name__ == "__main__":
     test_size = len(dataset) - train_size
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-    train_dataloader = DataLoader(train_dataset, batch_size=2, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=2, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=3, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=3, shuffle=False)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(LF_model.parameters(), lr=0.001)
 
-    num_epochs = 1
+    num_epochs = 10
     print(f'Training for {num_epochs} epochs...')
 
     for epoch in range(num_epochs):

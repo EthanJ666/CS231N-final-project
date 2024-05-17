@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
+from torch.utils.tensorboard import SummaryWriter
 from EmotionDataset import EmotionDataset
 from EmotionFrameDataset import EmotionFrameDataset
 
@@ -33,16 +34,18 @@ class EarlyFusionCNN(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.size()
-        x = x.view(B, T*C, H, W)
+        x = x.reshape(B, T*C, H, W)
 
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = self.pool(F.relu(self.conv3(x)))
+        x = x.view(B, -1)
         x = F.relu(self.fc1(x))
         #x = self.dropout(x)
         x = F.relu(self.fc2(x))
         # x = self.dropout(x)
         x = self.fc3(x)
+        return x
 
 
 if __name__ == "__main__":
@@ -52,8 +55,13 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f'using device {device}')
 
+    writer = SummaryWriter()
+
     EF_model = EarlyFusionCNN(num_frames).to(device)
     
+    pytorch_total_params = sum(p.numel() for p in EF_model.parameters() if p.requires_grad)
+    print(f'total params: {pytorch_total_params}')
+
     #######################################################
     #################### Edit Dataset #####################
     #######################################################
@@ -83,7 +91,7 @@ if __name__ == "__main__":
     test_dataloader = DataLoader(test_dataset, batch_size=2, shuffle=False)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(LF_model.parameters(), lr=0.001)
+    optimizer = optim.Adam(EF_model.parameters(), lr=0.001)
 
     num_epochs = 10
     print(f'Training for {num_epochs} epochs...')
@@ -96,20 +104,22 @@ if __name__ == "__main__":
 
                 inputs, e_labels = inputs.to(device), e_labels.to(device)
                 optimizer.zero_grad()
-                outputs = LF_model(inputs)
+                outputs = EF_model(inputs)
                 loss = criterion(outputs, e_labels)
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
 
                 tepoch.set_postfix(loss=loss.item())
+            avg_running_loss = running_loss/len(train_dataloader)
+            writer.add_scalar("Loss/train", avg_running_loss, epoch+1)
             print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_dataloader)}')
 
     # Save trained weights of EarlyFusion model
     torch.save(EF_model.state_dict(), 'early_fusion_weights.pth')
 
     print('Testing model...')
-    LF_model.eval()
+    EF_model.eval()
     test_loss = 0.0
     correct = 0
     total = 0
@@ -117,7 +127,7 @@ if __name__ == "__main__":
         with tqdm(test_dataloader, unit="batch") as tepoch:
             for inputs, e_labels in tepoch:
                 inputs, e_labels = inputs.to(device), e_labels.to(device)
-                outputs = LF_model(inputs)
+                outputs = EF_model(inputs)
                 loss = criterion(outputs, e_labels)
                 test_loss += loss.item()
                 _, predicted = torch.max(outputs, 1)
@@ -125,3 +135,6 @@ if __name__ == "__main__":
                 correct += (predicted == e_labels).sum().item()
 
     print(f'Test Loss: {test_loss/len(test_dataloader)}, Accuracy: {100 * correct / total}%')
+    writer.add_scalar("Acc/test", 100 * correct / total, 0)
+    writer.flush()
+    writer.close()
