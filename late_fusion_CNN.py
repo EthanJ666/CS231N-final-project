@@ -24,29 +24,28 @@ class NaiveCNN(nn.Module):
     """
     Simple Naive CNN model to extract features from given frame
     """
-    def __init__(self):
+    def __init__(self, height=1280, width=720):
         super(NaiveCNN, self).__init__()
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1, padding_mode='zeros')
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, padding_mode='zeros')
         self.conv1_bn = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1, padding_mode='zeros')
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1, padding_mode='zeros')
         self.conv2_bn = nn.BatchNorm2d(32)
         self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1, padding_mode='zeros')
         self.conv3_bn = nn.BatchNorm2d(64)
         self.conv4 = nn.Conv2d(64, 128, kernel_size=3, padding=1, padding_mode='zeros')
         self.conv4_bn = nn.BatchNorm2d(128)
-        #self.fc1 = nn.Linear(64 * 160 * 90, 1024)
-        self.fc1 = nn.Linear(128 * 80 * 45, 512)
+        self.fc1 = nn.Linear(128 * (height//64) * (width//64), 512)
         self.fc1_bn = nn.BatchNorm1d(512)
 
     def forward(self, x):
+        B = x.size(0)
         x = self.pool(F.relu(self.conv1_bn(self.conv1(x))))
         x = self.pool(F.relu(self.conv2_bn(self.conv2(x))))
         x = self.pool(F.relu(self.conv3_bn(self.conv3(x))))
         x = self.pool(F.relu(self.conv4_bn(self.conv4(x))))
-        x = x.reshape(-1, 128 * 80 * 45)
+        x = x.reshape(B, -1)
         x = F.relu(self.fc1_bn(self.fc1(x)))
-        #x = nn.ReLU(self.fc2(x))
 
         return x
 
@@ -120,13 +119,13 @@ if __name__ == "__main__":
     test_size = len(dataset) - train_size
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-    train_dataloader = DataLoader(train_dataset, batch_size=3, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=3, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=10, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=10, shuffle=False)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(LF_model.parameters(), lr=0.001)
 
-    num_epochs = 10
+    num_epochs = 25
     print(f'Training for {num_epochs} epochs...')
 
     for epoch in range(num_epochs):

@@ -2,6 +2,5 @@ __pycache__/
 dataset_images/
 dataset/
 dataset_test/
-late_fusion_weights.pth
-naive_cnn_weights.pth
+*.pth
 runs/
