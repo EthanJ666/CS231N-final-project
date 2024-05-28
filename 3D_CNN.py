@@ -3,6 +3,7 @@
 """
 CS231N 2023-2024: Final Project
 3D_CNN.py: Run the 3D Convolutional Neural Network
+Model structure adapted from our late_fusion_model
 Yichen Jiang <ycjiang@stanford.edu>
 Senyang Jiang <senyangj@stanford.edu>
 Suxi Li <suxi2024@stanford.edu>
