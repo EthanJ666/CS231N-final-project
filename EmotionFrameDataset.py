@@ -15,6 +15,10 @@ class EmotionFrameDataset(Dataset):
         self.paths_and_labels = make_dataset(root_dir, class_to_idx, extensions=['.pt'])
         self.device = device
 
+        # Ensure the number of samples is divisible by 10 - added by Suxi
+        if len(self.paths_and_labels) % 10 != 0:
+            self.paths_and_labels = self.paths_and_labels[:-(len(self.paths_and_labels) % 10)]
+
     def __len__(self):
         return len(self.paths_and_labels)
     
