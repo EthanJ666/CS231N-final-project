@@ -35,6 +35,9 @@ class Video3DCNN(nn.Module):
         self.conv4_bn = nn.BatchNorm3d(128)
         self.fc1 = nn.Linear(128 * (frames // 8) * (height // 32) * (width // 32), 512)
         self.fc1_bn = nn.BatchNorm1d(512)
+        self.fc2 = nn.Linear(512, 1024)
+        self.fc2_bn = nn.BatchNorm1d(1024)
+        self.fc3 = nn.Linear(1024, num_classes)
 
     def forward(self, x):
         B = x.size(0)
@@ -44,8 +47,12 @@ class Video3DCNN(nn.Module):
         x = self.pool(F.relu(self.conv4_bn(self.conv4(x))))
         x = x.view(B, -1)
         x = F.relu(self.fc1_bn(self.fc1(x)))
+        x = F.relu(self.fc2_bn(self.fc2(x)))
+        out = self.fc3(x)
 
+        return out
 
+"""
 class Emotion3DCNN(nn.Module):
     def __init__(self, cnn3d, cnn_features=512, num_classes=8):
         self.cnn = cnn3d
@@ -59,7 +66,7 @@ class Emotion3DCNN(nn.Module):
         out = self.fc2(y)
 
         return out
-
+"""
 
 if __name__ == "__main__":
     #num_classes = 8
@@ -70,8 +77,8 @@ if __name__ == "__main__":
 
     writer = SummaryWriter()
 
-    cnn_model = Video3DCNN().to(device)
-    cnn3d_model = Emotion3DCNN(cnn_model).to(device)
+    cnn3d_model = Video3DCNN().to(device)
+    #cnn3d_model = Emotion3DCNN(cnn_model).to(device)
 
     pytorch_total_params = sum(p.numel() for p in cnn3d_model.parameters() if p.requires_grad)
     print(f'total params: {pytorch_total_params}')
