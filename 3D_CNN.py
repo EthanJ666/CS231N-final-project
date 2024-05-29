@@ -22,7 +22,7 @@ from EmotionFrameDataset import EmotionFrameDataset
 
 
 class Video3DCNN(nn.Module):
-    def __init__(self, height=1280, width=720, frames=6):
+    def __init__(self, height=1280, width=720, frames=6, num_classes=8):
         super(Video3DCNN, self).__init__()
         self.pool = nn.MaxPool3d(kernel_size=(1, 2, 2), stride=(1, 2, 2))
         self.conv1 = nn.Conv3d(3, 16, kernel_size=(3, 3, 3), stride=(1, 2, 2), padding=1)
