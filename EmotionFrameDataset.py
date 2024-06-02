@@ -8,12 +8,14 @@ class EmotionFrameDataset(Dataset):
     """
     Dataset containing all sampled frames and corresponding emotion labels
     """
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, transforms):
         super(EmotionFrameDataset).__init__()
 
         _, class_to_idx = find_classes(root_dir)
         self.paths_and_labels = make_dataset(root_dir, class_to_idx, extensions=['.pt'])
 
+        self.transforms = transforms
+        self.enable_transform = False
         # Ensure the number of samples is divisible by 10 - added by Suxi
         if len(self.paths_and_labels) % 10 != 0:
             self.paths_and_labels = self.paths_and_labels[:-(len(self.paths_and_labels) % 10)]
@@ -24,4 +26,6 @@ class EmotionFrameDataset(Dataset):
     def __getitem__(self, idx):
         path, label = self.paths_and_labels[idx]
         frames = torch.load(path).type(torch.FloatTensor) / 255.0
+        if self.enable_transform:
+            frames = self.transforms(frames)
         return frames, label

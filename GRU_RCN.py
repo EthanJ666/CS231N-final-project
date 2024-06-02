@@ -12,26 +12,24 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from torch.autograd import Variable
-
 class ConvGRUCell(nn.Module):
     def __init__(self, input_size, hidden_size, kernel_size):
         super(ConvGRUCell, self).__init__()
         self.input_size  = input_size
         self.hidden_size = hidden_size
-        self.ConvGates   = nn.Conv2d(self.input_size + self.hidden_size,2 * self.hidden_size,kernel_size,padding='same')
-        self.Conv_ct     = nn.Conv2d(self.input_size + self.hidden_size,self.hidden_size,kernel_size,padding='same') 
+        self.ConvGates   = nn.Conv2d(self.input_size+self.hidden_size, 2*self.hidden_size, kernel_size, padding='same')
+        self.Conv_ct     = nn.Conv2d(self.input_size+self.hidden_size, self.hidden_size, kernel_size, padding='same') 
     
     def forward(self, input, hidden):
         if hidden is None:
             size_h = [input.size(0), self.hidden_size] + list(input.size()[2:])
             hidden = torch.zeros(size_h).to(input.device)
-        c1           = self.ConvGates(torch.cat((input,hidden),1))
-        (rt,ut)      = c1.chunk(2, 1)
+        c1           = self.ConvGates(torch.cat((input, hidden), dim=1))
+        (rt,ut)      = c1.chunk(chunks=2, dim=1)
         reset_gate   = F.sigmoid(rt)
         update_gate  = F.sigmoid(ut)
-        gated_hidden = torch.mul(reset_gate,hidden)
-        p1           = self.Conv_ct(torch.cat((input,gated_hidden),1))
+        gated_hidden = torch.mul(reset_gate, hidden)
+        p1           = self.Conv_ct(torch.cat((input, gated_hidden), dim=1))
         ct           = F.tanh(p1)
         next_h       = torch.mul(update_gate,hidden) + (1-update_gate)*ct
         return next_h
@@ -49,14 +47,14 @@ class RCN(nn.Module):
         self.conv3_bn = nn.BatchNorm2d(64)
 
         # RNN model taking conv maps from L=3 layers
-        self.rnn1 = ConvGRUCell(input_size=16, hidden_size=64, kernel_size=3)
-        self.rnn2 = ConvGRUCell(input_size=32, hidden_size=128, kernel_size=3)
-        self.rnn3 = ConvGRUCell(input_size=64, hidden_size=256, kernel_size=3)
+        self.rnn1 = ConvGRUCell(input_size=16, hidden_size=16, kernel_size=3)
+        self.rnn2 = ConvGRUCell(input_size=32, hidden_size=32, kernel_size=3)
+        self.rnn3 = ConvGRUCell(input_size=64, hidden_size=64, kernel_size=3)
         self.avgpool1 = nn.AvgPool2d(kernel_size=height//4)
         self.avgpool2 = nn.AvgPool2d(kernel_size=height//16)
         self.avgpool3 = nn.AvgPool2d(kernel_size=height//64)
 
-        self.fc1 = nn.Linear(64+128+256, num_classes)
+        self.fc1 = nn.Linear(16+32+64, num_classes)
 
     def forward(self, x):
         N, T, C, H, W = x.size()
