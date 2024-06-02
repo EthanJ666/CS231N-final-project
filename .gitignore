@@ -2,5 +2,6 @@ __pycache__/
 dataset_images/
 dataset/
 dataset_test/
+dataset_images_resize/
 *.pth
 runs/

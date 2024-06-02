@@ -4,6 +4,7 @@ import torch
 import torchvision
 from torchvision.datasets.folder import make_dataset, find_classes
 from torch.utils.data import Dataset
+import torch.nn.functional as F
 
 class EmotionVideoDataset(Dataset):
     """
@@ -13,7 +14,7 @@ class EmotionVideoDataset(Dataset):
         super(EmotionVideoDataset).__init__()
 
         self.n_frames = n_frames
-        class_to_idx, _ = find_classes(root_dir)
+        _, class_to_idx = find_classes(root_dir)
         self.paths_and_labels = make_dataset(root_dir, class_to_idx, extensions=['.mp4'])
 
     def __len__(self):
@@ -35,11 +36,13 @@ class EmotionVideoDataset(Dataset):
         """
         # Get video object
         video, _, metadata = torchvision.io.read_video(video_path, pts_unit='sec', output_format='TCHW')
-        # fps = int(metadata['video_fps'])
+        fps = int(metadata['video_fps'])
         total_frames = video.size(0)
-        start_frame = random.randrange(0, total_frames - 80)
-        sample_rate = 80 // n_frames
+        sample_rate = fps // 2
+        assert total_frames - sample_rate * (self.n_frames-1) > 0
+        start_frame = random.randrange(0, total_frames - sample_rate * (self.n_frames-1))
         idx = torch.arange(0, n_frames) * sample_rate + start_frame
         frames = video[idx]
-        frames = frames.type(torch.FloatTensor) / 255.0
-        return frames
+        resized_frames = F.interpolate(frames, size=(224,224), mode='bilinear', align_corners=False)
+        resized_frames = resized_frames.type(torch.FloatTensor) / 255.0
+        return resized_frames

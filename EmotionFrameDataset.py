@@ -8,12 +8,11 @@ class EmotionFrameDataset(Dataset):
     """
     Dataset containing all sampled frames and corresponding emotion labels
     """
-    def __init__(self, root_dir, device):
+    def __init__(self, root_dir):
         super(EmotionFrameDataset).__init__()
 
         _, class_to_idx = find_classes(root_dir)
         self.paths_and_labels = make_dataset(root_dir, class_to_idx, extensions=['.pt'])
-        self.device = device
 
         # Ensure the number of samples is divisible by 10 - added by Suxi
         if len(self.paths_and_labels) % 10 != 0:
